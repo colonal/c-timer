@@ -49,7 +49,8 @@ class Thread(QThread):
             self.Time = strftime("%I:%M:%S",t)
             self.timeNow.emit(str(self.Time))
             sleep(1)
-        self.timeNow.emit("00:00:00")
+        print("rest")
+        # self.timeNow.emit("00:00:00")
     
     def changeStopwatchStates(self):
         self.brack = not self.brack
@@ -91,7 +92,7 @@ class ThreadStopwatch(QThread):
             else:
                 s=str(s)
             self.Time =h+":"+m+":"+s
-            print(f"{h}:{m}:{s}")
+            print(f"ThreadStopwatch: {h}:{m}:{s}")
             #############################################
             self.t = self.Time
             self.timeNow.emit(str(self.Time))
@@ -100,6 +101,7 @@ class ThreadStopwatch(QThread):
     
     def resetTimer(self):
         self.t = "00:00:00"
+        print(f"ThreadStopwatch 1: {self.t}")
         self.timeNow.emit("00:00:00")
     def changeStopwatchStates(self):
         self.brack = not self.brack
@@ -139,7 +141,70 @@ class ThreadStopwatch(QThread):
             return d
             
         
-
+class ThreadTemporary(QThread):
+    timeNow = pyqtSignal(str)
+    brack = False
+    t = "00:00:00"
+    def run(self):
+        c = 0
+        
+        while self.brack:
+            print(f"ThreadTemporary: {self.t}")
+            sleep(1)
+            #############################################
+            d = str(self.t)
+            h,m,s = map(int,d.split(":"))
+            h = int(h)
+            m=int(m)
+            s= int(s)
+            
+            if(s>0):
+                s -=1
+            elif(s==0):
+                s=59
+                if(m > 0):
+                    m -= 1
+                elif(m==0):
+                    m=59
+                    if h == 0:
+                        # self.Time =f"{h}:{m}:{s}"
+                        # self.t = self.Time
+                        self.timeNow.emit(str("End Temporary"))
+                        break
+                    h -= 1
+            if(h<10):
+                h = str(0)+str(h)
+            else:
+                h= str(h)
+            if(m<10):
+                m = str(0)+str(m)
+            else:
+                m = str(m)
+            if(s<10):
+                s=str(0)+str(s)
+            else:
+                s=str(s)
+            self.Time =h+":"+m+":"+s
+            # print(f"{h}:{m}:{s}")
+            #############################################
+            self.t = self.Time
+            self.timeNow.emit(str(self.Time))
+            
+            c += 1
+    
+    def resetTimer(self):
+        self.t = "00:00:00"
+        print(f"ThreadTemporary1: {self.t}")
+        self.timeNow.emit("00:00:00")
+    
+    def setTimer(self, time):
+        self.t = time;
+        self.timeNow.emit(time)
+        
+    def changeStopwatchStates(self):
+        self.brack = not self.brack
+        
+        
 class MainWindow(QWidget):
     def __init__(self) -> None:
         super().__init__()
@@ -161,6 +226,8 @@ class MainWindow(QWidget):
         self.isTransparency = False
         self.StopwatchStates = False
         self.StopwatchPlayStates = False
+        self.TemporaryPlayStates = False
+        self.TemporaryStates = False
         self.ui()
         self.desine()
         self.tray()
@@ -170,6 +237,9 @@ class MainWindow(QWidget):
         
         self.ThreadStopwatch = ThreadStopwatch()
         self.ThreadStopwatch.timeNow.connect(self.setTime)
+        
+        self.ThreadTemporary = ThreadTemporary()
+        self.ThreadTemporary.timeNow.connect(self.setTime)
         
         self.leaveEvent = lambda e:self.windowLeave(e)
         self.enterEvent = lambda e:self.windowEnter(e)
@@ -203,6 +273,10 @@ class MainWindow(QWidget):
         
         self.StopwatchResut = QPushButton()
         
+        self.TemporaryPlay = QPushButton()
+        
+        self.TemporaryResut = QPushButton()
+        
         self.ExitButton = QPushButton()
         
         self.MaxButton = QPushButton()
@@ -225,6 +299,8 @@ class MainWindow(QWidget):
         
         self.VBoxButtonLeft.addWidget(self.StopwatchPlay)
         self.VBoxButtonLeft.addWidget(self.StopwatchResut)
+        self.VBoxButtonLeft.addWidget(self.TemporaryPlay)
+        self.VBoxButtonLeft.addWidget(self.TemporaryResut)
         self.VBox.addStretch()
         self.HBoxTB.addLayout(self.VBoxButtonLeft)
         self.HBoxTB.addStretch()
@@ -268,6 +344,17 @@ class MainWindow(QWidget):
         self.StopwatchResut.hide()
         
         
+        self.TemporaryPlay.setStyleSheet("background-color: rgba(225,225,225,0)")
+        self.TemporaryPlay.setIcon(QIcon(resource_path('image\\power-button.png')))
+        self.TemporaryPlay.clicked.connect(self.TemporaryPlayChange)
+        self.TemporaryPlay.hide()
+        
+        self.TemporaryResut.setStyleSheet("background-color: rgba(225,225,225,0)")
+        self.TemporaryResut.setIcon(QIcon(resource_path('image\\arrow.png')))
+        self.TemporaryResut.clicked.connect(self.TemporaryResutChange)
+        self.TemporaryResut.hide()
+        
+        
         self.ExitButton.setStyleSheet("background-color: rgba(225,225,225,0)")
         self.ExitButton.setIcon(QIcon(resource_path('image\\close.png')))
         self.ExitButton.clicked.connect(self.EXIT)
@@ -299,7 +386,7 @@ class MainWindow(QWidget):
         self.TemporaryWidgetUI()
         
         self.HBox.setContentsMargins(0,0,0,0)
-        # self.HBox.addStretch()
+        self.HBox.addStretch()
         self.VBox.setContentsMargins(0,0,0,0)
         self.HBoxMain.setContentsMargins(0,0,0,0)
         self.VBoxButtonRight.setContentsMargins(0,0,0,0)
@@ -312,10 +399,17 @@ class MainWindow(QWidget):
         rx  = QtCore.QRegExp("[0-9]{2}")                               
         val = QtGui.QRegExpValidator(rx)                              
         self.LineHours.setValidator(val)
+        self.LineHours.setText("00")
+        self.LineHours.setSelection(0,2)
+        
         self.LineHours.textChanged.connect(lambda: self.TextChanged(self.LineHours,self.LineMinutes))
         self.LineMinutes.setValidator(val)
+        self.LineMinutes.setText("00")
+        self.LineMinutes.setSelection(0,2)
         self.LineMinutes.textChanged.connect(lambda: self.TextChanged(self.LineMinutes,self.LineSeconds))
         self.LineSeconds.setValidator(val)
+        self.LineSeconds.setText("00")
+        self.LineSeconds.setSelection(0,2)
         
         hBox.addWidget(self.LineHours)
         hBox.addWidget(QCustomLabel())
@@ -340,16 +434,61 @@ class MainWindow(QWidget):
                 """
     def TextChanged(self,widget,nextF):
         print(widget.text())
-        if len(widget.text()) == 2:
+        if len(widget.text()) >= 2:
             nextF.setFocus()
             
     def setTime(self, time):
+        if time =="End Temporary":
+            self.TemporaryPlayChange()
+            self.TimeLabel.setText("00:00:00")
+            return
         self.TimeLabel.setText(str(time))
+    
+    def TemporaryPlayChange(self):
+        Hours  = self.LineHours.text()
+        Minutes  = self.LineMinutes.text()
+        Seconds  = self.LineSeconds.text()
+        
+        # print(f"{Hours}:{Minutes}:{Seconds}")
+        
+        print(self.TemporaryPlayStates)
+        if (not self.TemporaryPlayStates):
+            self.TemporaryPlayStates = True
+            self.TemporaryWidget.hide()
+            self.TimeLabel.show()
+            
+            self.threadTimer.changeStopwatchStates()
+            self.ThreadTemporary.changeStopwatchStates()
+            self.ThreadTemporary.setTimer(f"{Hours}:{Minutes}:{Seconds}")
+            self.ThreadTemporary.start()
+            self.TemporaryPlay.setIcon(QIcon(resource_path('image\\stop-button.png')))
+        else:
+            self.TemporaryPlayStates = False
+            self.TemporaryPlay.setIcon(QIcon(resource_path('image\\power-button.png')))
+            self.ThreadTemporary.changeStopwatchStates()
+            
+            
+        
+    
+    def TemporaryResutChange(self):
+        self.TemporaryPlayChange()
+        self.ThreadTemporary.resetTimer()
+        self.TimeLabel.hide()
+        self.TemporaryWidget.show()
+    
     def StopwatchResutChange(self):
         print("StopwatchResutChange")
         self.ThreadStopwatch.resetTimer()
     def StopwatchChange(self):
+        print(not self.StopwatchStates)
         if not self.StopwatchStates :
+            self.setTime("00:00:00")
+            if not self.TimeLabel.isVisible():
+                # self.TemporaryWidget.hide()
+                # self.TemporaryPlay.hide()
+                # self.TemporaryResut.hide()
+                # self.TimeLabel.show()
+                self.TemporaryChange()
             if self.size().width()<300:
                 self.TimeLabel.setStyleSheet("QLabel{font-size:35px;color:#ffffff;}")
             else:
@@ -360,9 +499,10 @@ class MainWindow(QWidget):
             self.StopwatchPlay.show()
             self.StopwatchResut.show()
             
+            
         else:
             if self.size().width()<300:
-                self.TimeLabel.setStyleSheet("QLabel{font-size:40px;color:#ffffff;}")
+                self.TimeLabel.setStyleSheet("QLabel{font-size:35px;color:#ffffff;}")
             else:
                 self.TimeLabel.setStyleSheet("QLabel{font-size:150px;color:#ffffff;}")
             self.StopwatchStates = False
@@ -371,15 +511,82 @@ class MainWindow(QWidget):
             self.threadTimer.changeStopwatchStates()
             self.threadTimer.start()
             self.Stopwatch.setIcon(QIcon(resource_path('image\\stopwatchS.png')))
-            
+
     def TemporaryChange(self):
-        print(self.TimeLabel.isVisible())
-        if  self.TimeLabel.isVisible():
+        print(self.TemporaryWidget.isVisible())
+        if not self.TemporaryWidget.isVisible():
+            if  self.StopwatchStates:
+                self.StopwatchChange()
+            self.TemporaryStates = True
+            if self.size().width()<300:
+                self.TimeLabel.setStyleSheet("QLabel{font-size:35px;color:#ffffff;}")
+            else:
+                self.TimeLabel.setStyleSheet("QLabel{font-size:150px;color:#ffffff;}")
             self.TimeLabel.hide()
             self.TemporaryWidget.show()
+            self.LineHours.setFocus()
+            self.TemporaryPlay.show()
+            self.TemporaryResut.show()
+            self.StopwatchPlay.hide()
+            self.StopwatchResut.hide()
+            self.Temporary.setIcon(QIcon(resource_path('image\\temporary-offer.png')))
+            
+                
         else:
+            self.TemporaryStates = False
+            if self.size().width()<300:
+                self.TimeLabel.setStyleSheet("QLabel{font-size:35px;color:#ffffff;}")
+            else:
+                self.TimeLabel.setStyleSheet("QLabel{font-size:150px;color:#ffffff;}")
+                
+            if(self.threadTimer.brack == False):
+                self.threadTimer.brack = True
+                self.threadTimer.start()
             self.TimeLabel.show()
             self.TemporaryWidget.hide()
+            self.TemporaryPlay.hide()
+            self.TemporaryResut.hide()
+            self.Temporary.setIcon(QIcon(resource_path('image\\temporary.png')))
+            
+            
+    def TemporaryChange1(self):
+        print(self.TimeLabel.isVisible())
+        # if  self.TimeLabel.isVisible():
+        #     self.TimeLabel.hide()
+        #     self.TemporaryWidget.show()
+        #     self.TemporaryPlay.show()
+        #     self.TemporaryResut.show()
+        # else:
+        #     self.TimeLabel.show()
+        #     self.TemporaryWidget.hide()
+        #     self.TemporaryPlay.hide()
+        #     self.TemporaryResut.hide()
+        
+        if self.TimeLabel.isVisible():
+            self.TimeLabel.hide()
+            # self.Stopwatch.hide()
+            if self.size().width()<300:
+                self.TimeLabel.setStyleSheet("QLabel{font-size:35px;color:#ffffff;}")
+            else:
+                self.TimeLabel.setStyleSheet("QLabel{font-size:150px;color:#ffffff;}")
+            self.StopwatchStates = True
+
+            self.Temporary.setIcon(QIcon(resource_path('image\\temporary-offer.png')))
+            self.TemporaryPlay.show()
+            self.TemporaryResut.show()
+            
+        else:
+            self.TimeLabel.show()
+            self.Stopwatch.hide()
+            if self.size().width()<300:
+                self.TimeLabel.setStyleSheet("QLabel{font-size:35px;color:#ffffff;}")
+            else:
+                self.TimeLabel.setStyleSheet("QLabel{font-size:150px;color:#ffffff;}")
+            self.StopwatchStates = False
+            self.TemporaryPlay.hide()
+            self.TemporaryResut.hide()
+
+            self.Temporary.setIcon(QIcon(resource_path('image\\temporary.png')))
             
     def StopwatchPlayChange(self):
         if not self.StopwatchPlayStates:
@@ -430,13 +637,15 @@ class MainWindow(QWidget):
             self.Temporary.hide()
             self.StopwatchPlay.hide()
             self.StopwatchResut.hide()
+            self.TemporaryPlay.hide()
+            self.TemporaryResut.hide()
             self.setFixedSize(200,70)
     
     def windowEnter(self,_):
         w = self.size()
         if (w.width()< 300):
             self.setFixedSize(210,90)
-            self.TimeLabel.setStyleSheet("QLabel{font-size:40px;color:#ffffff;}")
+            self.TimeLabel.setStyleSheet("QLabel{font-size:35px;color:#ffffff;}")
             self.wid.setStyleSheet("background-color: rgba(0,0,0,0.6)")
             self.ExitButton.show()
             self.HideButton.show()
@@ -448,6 +657,11 @@ class MainWindow(QWidget):
                 self.TimeLabel.setStyleSheet("QLabel{font-size:35px;color:#ffffff;}")
                 self.StopwatchPlay.show()
                 self.StopwatchResut.show()
+            
+            if self.TemporaryStates:
+                self.TimeLabel.setStyleSheet("QLabel{font-size:35px;color:#ffffff;}")
+                self.TemporaryPlay.show()
+                self.TemporaryResut.show()
     
     def HIDE(self):
         # self.showMinimized()
